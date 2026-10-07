@@ -1,0 +1,51 @@
+name: Publish EBike Gibraltar preview
+on:
+  push:
+    branches: [main]
+    paths:
+      - site.zip
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out preview
+        uses: actions/checkout@v6
+      - name: Confirm preview bundle
+        id: bundle
+        run: |
+          if test -f site.zip; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Preview bundle has not been uploaded yet." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Extract approved static website
+        if: steps.bundle.outputs.ready == 'true'
+        run: |
+          mkdir -p _site
+          unzip -q site.zip -d _site
+          test -f _site/index.html
+      - name: Configure Pages
+        if: steps.bundle.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
+      - name: Upload website
+        if: steps.bundle.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Publish preview
+        if: steps.bundle.outputs.ready == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
